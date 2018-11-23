@@ -1,11 +1,16 @@
 package main
 
 import (
-    "fmt"
+    "log"
     "./shim"
 )
 
 func main() {
+    err := shim.StartArpSpoof()
+    if err != nil {
+        return
+    }
+
     downgradeHandler := shim.NewDowngradeHandler()
     server := shim.Server{
         RequestHandlers: []shim.RequestHandler{
@@ -15,6 +20,6 @@ func main() {
             downgradeHandler,
         },
     }
-    err := server.Run(80)
-    fmt.Println(err.Error())
+    err = server.Run(80)
+    log.Println(err.Error())
 }

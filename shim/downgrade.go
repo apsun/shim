@@ -133,37 +133,6 @@ func isTagWithURL(n *html.Node, attr html.Attribute) bool {
     return false
 }
 
-// Recursive helper for downgradeHTML.
-func (h *DowngradeHandler) downgradeHTMLHelper(resp *http.Response, n *html.Node) {
-    // Downgrade all known URLs in the page
-    if n.Type == html.ElementNode {
-        if (n.Data == "meta") {
-            h.downgradeHTMLMeta(resp, n)
-        }
-
-        for i, attr := range n.Attr {
-            if isTagWithURL(n, attr) {
-                u, err := url.Parse(attr.Val)
-                if err != nil {
-                    continue
-                }
-
-                err = h.downgradeURL(resp, u)
-                if err != nil {
-                    continue
-                }
-
-                n.Attr[i].Val = u.String()
-            }
-        }
-    }
-
-    // Recurse into children nodes
-    for c := n.FirstChild; c != nil; c = c.NextSibling {
-        h.downgradeHTMLHelper(resp, c)
-    }
-}
-
 // Downgrades any URLs in a <meta http-equiv="refresh"> tag.
 // This is commonly used to redirect HTTP -> HTTPS.
 func (h *DowngradeHandler) downgradeHTMLMeta(resp *http.Response, n *html.Node) {
@@ -172,6 +141,7 @@ func (h *DowngradeHandler) downgradeHTMLMeta(resp *http.Response, n *html.Node) 
     for _, attr := range n.Attr {
         if lower(attr.Key) == "http-equiv" && lower(attr.Val) == "refresh" {
             refresh = true
+            break
         }
     }
 
@@ -203,6 +173,37 @@ func (h *DowngradeHandler) downgradeHTMLMeta(resp *http.Response, n *html.Node) 
             n.Attr[i].Val = attr.Val[:val] + u.String()
             return
         }
+    }
+}
+
+// Recursive helper for downgradeHTML.
+func (h *DowngradeHandler) downgradeHTMLHelper(resp *http.Response, n *html.Node) {
+    // Downgrade all known URLs in the page
+    if n.Type == html.ElementNode {
+        if (n.Data == "meta") {
+            h.downgradeHTMLMeta(resp, n)
+        } else {
+            for i, attr := range n.Attr {
+                if isTagWithURL(n, attr) {
+                    u, err := url.Parse(attr.Val)
+                    if err != nil {
+                        continue
+                    }
+
+                    err = h.downgradeURL(resp, u)
+                    if err != nil {
+                        continue
+                    }
+
+                    n.Attr[i].Val = u.String()
+                }
+            }
+        }
+    }
+
+    // Recurse into children nodes
+    for c := n.FirstChild; c != nil; c = c.NextSibling {
+        h.downgradeHTMLHelper(resp, c)
     }
 }
 
