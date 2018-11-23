@@ -19,27 +19,6 @@ type Gateway struct {
     iface *net.Interface
 }
 
-func setIpForwarding(enabled bool) error {
-    f, err := os.Create("/proc/sys/net/ipv4/ip_forward")
-    if err != nil {
-        return err
-    }
-    defer f.Close()
-
-    var val byte = '0'
-    if enabled {
-        val = '1'
-    }
-
-    _, err = f.Write([]byte{val})
-    if err != nil {
-        return err
-    }
-
-    log.Printf("Set IP forwarding enabled -> %t\n", enabled)
-    return nil
-}
-
 // Reads the gateway routes on the local machine from procfs.
 func getGateways() ([]Gateway, error) {
     f, err := os.Open("/proc/net/route")
@@ -214,7 +193,7 @@ func arpSpoof(gateway Gateway) error {
 
             // Add sender IP address to our known hosts list.
             // Avoid target IP address since it might not exist.
-            if !hosts[string(pkt.SenderIP)] {
+            if !pkt.SenderIP.Equal(net.IPv4zero) && !hosts[string(pkt.SenderIP)] {
                 log.Printf("Discovered new host: %s\n", pkt.SenderIP)
                 hosts[string(pkt.SenderIP)] = true
             }
@@ -226,13 +205,6 @@ func arpSpoof(gateway Gateway) error {
 // This blocks until the attack stops (which only
 // occurs on an error).
 func ArpSpoof() error {
-    err := setIpForwarding(true)
-    if err != nil {
-        log.Printf("Failed to enable IP forwarding: %s\n", err)
-        return err
-    }
-    defer setIpForwarding(false)
-
     gateways, err := getGateways()
     if err != nil {
         log.Printf("Failed to find gateways: %s\n", err)

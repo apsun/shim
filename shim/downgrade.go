@@ -2,6 +2,7 @@ package shim
 
 import (
     "io"
+    "log"
     "net/http"
     "net/url"
     "strings"
@@ -58,6 +59,7 @@ func (h *DowngradeHandler) downgradeURL(resp *http.Response, u *url.URL) error {
     // (e.g. //example.com) link and the base URL was downgraded,
     // replace it with an explicit HTTP link.
     if newURL.Scheme == "https" || !isAbsURL && h.isDowngradedURL(resp.Request.URL) {
+        log.Printf("Downgrading URL: %s\n", newURL)
         h.isHTTPS[hashURL(newURL)] = true
         newURL.Scheme = "http"
     }

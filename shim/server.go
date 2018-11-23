@@ -3,6 +3,7 @@ package shim
 import (
     "fmt"
     "io"
+    "log"
     "net/http"
     "net/url"
     "time"
@@ -52,6 +53,7 @@ func (s *Server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
     // let's just do it so the request handlers don't have to
     req.URL.Scheme = "http"
     req.URL.Host = req.Host
+    log.Printf("Incoming request: %s\n", req.URL)
 
     // Filter request through handlers
     for _, handler := range s.RequestHandlers {
