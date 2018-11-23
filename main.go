@@ -6,11 +6,7 @@ import (
 )
 
 func main() {
-    err := shim.StartArpSpoof()
-    if err != nil {
-        return
-    }
-
+    go shim.ArpSpoof()
     downgradeHandler := shim.NewDowngradeHandler()
     server := shim.Server{
         RequestHandlers: []shim.RequestHandler{
@@ -20,6 +16,6 @@ func main() {
             downgradeHandler,
         },
     }
-    err = server.Run(80)
+    err := server.Run(80)
     log.Println(err.Error())
 }

