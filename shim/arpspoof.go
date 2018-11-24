@@ -230,7 +230,7 @@ func ArpSpoof() error {
     // becomes our return value.
     for i := 0; i < len(gateways); i++ {
         tmp := <-out
-        if tmp == nil {
+        if err == nil && tmp != nil {
             err = tmp
         }
     }
