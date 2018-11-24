@@ -154,10 +154,9 @@ func arpSpoof(gateway Gateway) error {
             host := net.IP(hostStr)
 
             // Tell everyone in the LAN that we are the gateway.
-            // But only tell the gateway that we are everyone in the LAN.
-            // Some devices (e.g. iPhone) detect that someone is spoofing
-            // their MAC address and treat it as an IP address conflict
-            // and disconnect from the network.
+            // But only tell the gateway that we are anyone in the LAN.
+            // Some devices (e.g. iPhone) detect ARP spoof attacks as
+            // an IP address conflict and disconnect from the network.
             destMAC := broadcastMAC
             if !host.Equal(gateway.ip) {
                 destMAC = gatewayMAC
